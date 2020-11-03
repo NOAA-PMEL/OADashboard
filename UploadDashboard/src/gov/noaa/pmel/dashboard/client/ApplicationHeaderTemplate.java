@@ -93,7 +93,7 @@ public class ApplicationHeaderTemplate extends Composite {
         logger.info("Logger Header logout");
         UploadDashboard.closePopups();
         try {
-        UploadDashboard.getService().logoutUser(new OAPAsyncCallback<Void>() {
+        UploadDashboard.getService().logoutUser(new OAPAsyncCallback<Void>("logout") {
             @Override
             public void onSuccess(Void nada) {
                 UploadDashboard.logToConsole("Logout success");
@@ -103,7 +103,7 @@ public class ApplicationHeaderTemplate extends Composite {
                 Window.Location.assign("dashboardlogout.html");
             }
             @Override
-            public void onFailure(Throwable ex) {
+            public void handleException(Throwable ex) {
                 UploadDashboard.logToConsole("Logout error:" + ex.toString());
 //                Window.alert(String.valueOf(ex));
                 Cookies.removeCookie("JSESSIONID");

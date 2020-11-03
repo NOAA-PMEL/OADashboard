@@ -41,23 +41,9 @@ public class DashboardAskPopup extends Composite {
 	Boolean answer;
 	HandlerRegistration askHandler;
 
-    public static enum QuestionType {
-        PLAIN("images/blank_1px.gif"),
-        QUESTION("images/questionMark_64px.png"),
-        WARNING("images/warning_64px.png"),
-        CRITICAL("images/warning_64px-redblack.png");
-        
-        private String _iconSrc;
-        
-        private QuestionType(String iconSrc) {
-            this._iconSrc = iconSrc;
-        }
-        String iconSrc() { return _iconSrc; }
-    }
-    
-	public DashboardAskPopup(String yesText, String noText,	
+    public DashboardAskPopup(String yesText, String noText,	
                 			 final AsyncCallback<Boolean> callback) {
-        this(yesText, noText, QuestionType.PLAIN, callback);
+        this(yesText, noText, MessageInformationType.PLAIN, callback);
 	}
     
 	/**
@@ -77,7 +63,7 @@ public class DashboardAskPopup extends Composite {
 	 * 		yes or no button.  The onFailure method of this callback is
 	 * 		never called.
 	 */
-	public DashboardAskPopup(String yesText, String noText,	QuestionType questionType,
+	public DashboardAskPopup(String yesText, String noText,	MessageInformationType questionType,
                 			 final AsyncCallback<Boolean> callback) {
 		initWidget(uiBinder.createAndBindUi(this));
 

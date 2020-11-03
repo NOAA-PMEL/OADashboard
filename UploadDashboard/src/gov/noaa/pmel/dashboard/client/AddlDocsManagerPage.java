@@ -336,17 +336,21 @@ public class AddlDocsManagerPage extends CompositeWithUsername {
 			message += OVERWRITE_WARNING_MSG_EPILOGUE;
 			if ( askOverwritePopup == null ) {
 				askOverwritePopup = new DashboardAskPopup(OVERWRITE_YES_TEXT, 
-						OVERWRITE_NO_TEXT, new OAPAsyncCallback<Boolean>() {
+						OVERWRITE_NO_TEXT, new AsyncCallback<Boolean>() {
 					@Override
 					public void onSuccess(Boolean result) {
 						// Submit only if yes
-						if ( result == true ) {
-							assignTokens();
-							uploadForm.submit();
+						if ( result.booleanValue() == true ) {
+                            try {
+    							assignTokens();
+    							uploadForm.submit();
+                            } catch (Exception ex) {
+                                UploadDashboard.serviceException("submit documents", ex);
+                            }
 						}
 					}
 					@Override
-					public void customFailure(Throwable ex) {
+					public void onFailure(Throwable ex) {
                         Window.alert("Error from popup: " + ex.toString()); // Should never be called.
 					}
 				});
@@ -372,16 +376,11 @@ public class AddlDocsManagerPage extends CompositeWithUsername {
 		// Contact the server to obtain the latest set 
 		// of supplemental documents for the current cruises
 		service.getUpdatedDatasets(getUsername(), datasetIds, 
-				new OAPAsyncCallback<DashboardDatasetList>() {
+				new OAPAsyncCallback<DashboardDatasetList>("show additional documents") {
 			@Override
 			public void onSuccess(DashboardDatasetList cruiseList) {
 				// Update the list shown in this page
 				updateAddlDocs(cruiseList);
-				UploadDashboard.showAutoCursor();
-			}
-			@Override
-			public void customFailure(Throwable ex) {
-				UploadDashboard.showFailureMessage(ADDL_DOCS_LIST_FAIL_MSG, ex);
 				UploadDashboard.showAutoCursor();
 			}
 		});
@@ -577,16 +576,11 @@ public class AddlDocsManagerPage extends CompositeWithUsername {
 		// Send the request to the server
 		UploadDashboard.showWaitCursor();
 		service.deleteAddlDoc(getUsername(), deleteFilename, deleteId, 
-				datasetIds, new OAPAsyncCallback<DashboardDatasetList>() {
+				datasetIds, new OAPAsyncCallback<DashboardDatasetList>("delete additional documents") {
 			@Override
 			public void onSuccess(DashboardDatasetList cruiseList) {
 				// Update the list shown in this page
 				updateAddlDocs(cruiseList);
-				UploadDashboard.showAutoCursor();
-			}
-			@Override
-			public void customFailure(Throwable ex) {
-				UploadDashboard.showFailureMessage(DELETE_DOCS_FAIL_MSG, ex);
 				UploadDashboard.showAutoCursor();
 			}
 		});

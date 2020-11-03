@@ -41,7 +41,6 @@ import com.google.gwt.user.client.ui.PopupPanel;
 import com.google.gwt.user.client.ui.RadioButton;
 import com.google.gwt.user.client.ui.Widget;
 
-import gov.noaa.pmel.dashboard.client.DashboardAskPopup.QuestionType;
 import gov.noaa.pmel.dashboard.shared.DashboardDataset;
 import gov.noaa.pmel.dashboard.shared.DashboardUtils;
 
@@ -444,7 +443,7 @@ public class DataUpdatePopup extends Composite {
             } else {
                 replaceMessage = buildUpdateMessage(newFileName);
             }
-            UploadDashboard.ask(replaceMessage,"Yes","Cancel",QuestionType.QUESTION,new AsyncCallback<Boolean>() {
+            UploadDashboard.ask(replaceMessage,"Yes","Cancel",MessageInformationType.QUESTION,new AsyncCallback<Boolean>() {
                 @Override
                 public void onSuccess(Boolean answer) {
                     if ( answer.booleanValue()) {

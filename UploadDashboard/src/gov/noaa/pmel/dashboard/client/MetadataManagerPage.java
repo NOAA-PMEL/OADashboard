@@ -372,7 +372,7 @@ public class MetadataManagerPage extends CompositeWithUsername {
 		// Return to the cruise list page which might have been updated
         if ( confirmCancel ) {
             DashboardAskPopup confirm = new DashboardAskPopup(YES_TEXT, NO_TEXT, 
-                                                              DashboardAskPopup.QuestionType.WARNING,
+                                                              MessageInformationType.WARNING,
               new AsyncCallback<Boolean>() {
                       @Override
                       public void onSuccess(Boolean result) {
@@ -400,7 +400,7 @@ public class MetadataManagerPage extends CompositeWithUsername {
     
     private void sendCurrentMetadataToMetaEd(String datasetId) {
         try {
-            service.sendMetadataInfo(getUsername(), datasetId, new OAPAsyncCallback<MetadataPreviewInfo>() {
+            service.sendMetadataInfo(getUsername(), datasetId, new OAPAsyncCallback<MetadataPreviewInfo>("load metadata") {
                 @Override
                 public void onSuccess(MetadataPreviewInfo result) {
             		UploadDashboard.updateCurrentPage(singleton);
@@ -419,14 +419,14 @@ public class MetadataManagerPage extends CompositeWithUsername {
                     }
                 }
                 @Override
-                public void customFailure(Throwable caught) {
+                public void handleException(Throwable caught) {
                     String msg = caught.getMessage();
                     doneButton.setEnabled(false);
                     confirmCancel = false;
                     if ( caught instanceof NotFoundException ) {
                         UploadDashboard.showMessage(msg);
                     } else {
-                        UploadDashboard.showFailureMessage(msg, caught);
+                        UploadDashboard.serviceException("load metadata", caught);
                     }
                     UploadDashboard.showAutoCursor();
                     if ( DatasetListPage.meLink != null ) {

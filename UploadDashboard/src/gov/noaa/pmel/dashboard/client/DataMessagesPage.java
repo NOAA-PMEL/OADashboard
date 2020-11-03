@@ -141,11 +141,11 @@ public class DataMessagesPage extends CompositeWithUsername {
 	 */
 	static void showPage(String username, String datasetId, String displayName) {
 		UploadDashboard.showWaitCursor();
-		service.getDataMessages(username, datasetId, new OAPAsyncCallback<ADCMessageList>() {
+		service.getDataMessages(username, datasetId, new OAPAsyncCallback<ADCMessageList>("get data check messages") {
 			@Override
 			public void onSuccess(ADCMessageList msgList) {
 				if ( msgList == null ) {
-					UploadDashboard.showMessage("Unexpected list of data problems returned");
+					UploadDashboard.showMessage("Unexpected empty list of data problems returned");
 					UploadDashboard.showAutoCursor();
 					return;
 				}
@@ -153,11 +153,6 @@ public class DataMessagesPage extends CompositeWithUsername {
 					singleton = new DataMessagesPage();
 				UploadDashboard.updateCurrentPage(singleton);
 				singleton.updateMessages(msgList, displayName);
-				UploadDashboard.showAutoCursor();
-			}
-			@Override
-			public void customFailure(Throwable ex) {
-				UploadDashboard.showFailureMessage("Unexpected failure obtaining the list of data problems", ex);
 				UploadDashboard.showAutoCursor();
 			}
 		});

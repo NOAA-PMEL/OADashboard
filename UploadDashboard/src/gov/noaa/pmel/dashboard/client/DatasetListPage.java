@@ -49,7 +49,6 @@ import com.google.gwt.user.client.ui.Widget;
 import com.google.gwt.view.client.CellPreviewEvent;
 import com.google.gwt.view.client.ListDataProvider;
 
-import gov.noaa.pmel.dashboard.client.DashboardAskPopup.QuestionType;
 import gov.noaa.pmel.dashboard.client.UploadDashboard.PagesEnum;
 import gov.noaa.pmel.dashboard.shared.DashboardDataset;
 import gov.noaa.pmel.dashboard.shared.DashboardDatasetList;
@@ -701,7 +700,7 @@ public class DatasetListPage extends CompositeWithUsername {
 	static void showPage() {
 		UploadDashboard.showWaitCursor();
 		// Request the latest cruise list
-		service.getDatasetList(null, new OAPAsyncCallback<DashboardServiceResponse<DashboardDatasetList>>() {
+		service.getDatasetList(null, new OAPAsyncCallback<DashboardServiceResponse<DashboardDatasetList>>("get dataset list") {
 			@Override
 			public void onSuccess(DashboardServiceResponse<DashboardDatasetList> result) {
                 DashboardDatasetList cruises = result.response();
@@ -714,16 +713,16 @@ public class DatasetListPage extends CompositeWithUsername {
 				singleton.updateDatasets(cruises);
 				UploadDashboard.showAutoCursor();
 			}
-			@Override
-			public void customFailure(Throwable ex) {
-				String exMsg = ex.getMessage();
-				if ( exMsg.indexOf("SESSION HAS EXPIRED") >= 0 ) {
-					UploadDashboard.showMessage("Your session has expired.<br/><br/>Please log in again.");
-				} else {
-					UploadDashboard.showFailureMessage(GET_DATASET_LIST_ERROR_MSG, ex);
-					UploadDashboard.showAutoCursor();
-				}
-			}
+//			@Override
+//			public void customFailure(Throwable ex) {
+//				String exMsg = ex.getMessage();
+//				if ( exMsg.indexOf("SESSION HAS EXPIRED") >= 0 ) {
+//					UploadDashboard.showMessage("Your session has expired.<br/><br/>Please log in again.");
+//				} else {
+//					UploadDashboard.showFailureMessage(GET_DATASET_LIST_ERROR_MSG, ex);
+//					UploadDashboard.showAutoCursor();
+//				}
+//			}
 		});
         if ( meLink != null ) {
             meLink.setAttribute("style", "cursor:pointer;"+LINK_COLOR+UNDERLINE_LINKS);
@@ -951,7 +950,7 @@ public class DatasetListPage extends CompositeWithUsername {
                 return;
             }
             DashboardDataset selectedDataset = selectedDatasets.values().iterator().next();
-            UploadDashboard.pingService(new OAPAsyncCallback<Void>() {
+            UploadDashboard.pingService(new OAPAsyncCallback<Void>("session check") {
                 @Override
                 public void onSuccess(Void arg0) {
                     UploadDashboard.showUpdateSubmissionDialog(getUsername(), selectedDataset);
@@ -979,7 +978,7 @@ public class DatasetListPage extends CompositeWithUsername {
                 return;
             }
             DashboardDataset selectedDataset = selectedDatasets.values().iterator().next();
-            UploadDashboard.pingService(new OAPAsyncCallback<Void>() {
+            UploadDashboard.pingService(new OAPAsyncCallback<Void>("session check") {
                 @Override
                 public void onSuccess(Void arg0) {
                     UploadDashboard.showUpdateSubmissionDialog(getUsername(), selectedDataset);
@@ -1007,19 +1006,14 @@ public class DatasetListPage extends CompositeWithUsername {
             String selectedRecordId = selectedDatasets.keySet().iterator().next();
             DashboardDataset dataset = selectedDatasets.get(selectedRecordId);
             UploadDashboard.ask("Confirm cloning of submission record " + selectedRecordId +".", 
-                                "Clone", "Cancel", QuestionType.WARNING, 
-                new OAPAsyncCallback<Boolean>() {
+                                "Clone", "Cancel", MessageInformationType.WARNING, 
+                new OAPAsyncCallback<Boolean>("confirm") {
                     @Override
                     public void onSuccess(Boolean result) {
                         if ( result.booleanValue()) {
                             UploadDashboard.showWaitCursor();
                             service.cloneDataset(getUsername(), selectedRecordId, true, 
-                                new AsyncCallback<DashboardDatasetList>() {
-                                    @Override
-                                    public void onFailure(Throwable caught) {
-                                        UploadDashboard.showAutoCursor();
-                                        UploadDashboard.showFailureMessage("There was an error cloning the submission.", caught);
-                                    }
+                                new OAPAsyncCallback<DashboardDatasetList>("clone dataset") {
                                     @Override
                                     public void onSuccess(DashboardDatasetList result) {
                                         UploadDashboard.showAutoCursor();
@@ -1080,15 +1074,11 @@ public class DatasetListPage extends CompositeWithUsername {
 
 	@UiHandler("previewButton")
 	void previewButtonOnClick(ClickEvent event) {
-	    UploadDashboard.pingService(new OAPAsyncCallback<Void>() {
+	    UploadDashboard.pingService(new OAPAsyncCallback<Void>("session check") {
             @Override
             public void onSuccess(Void arg0) {
                 GWT.log("successful ping.");
                 _previewButtonOnClick(event);
-            }
-            @Override
-            public void customFailure(Throwable t) {
-                GWT.log("ping fail: "+ t);
             }
         });
 	}
@@ -1155,15 +1145,11 @@ public class DatasetListPage extends CompositeWithUsername {
         preLaunchArchiveSubmit(getSelectedDatasets());
 	}
 	void preLaunchArchiveSubmit(DashboardDatasetList datasets) {
-	    UploadDashboard.pingService(new OAPAsyncCallback<Void>() {
+	    UploadDashboard.pingService(new OAPAsyncCallback<Void>("session check") {
             @Override
             public void onSuccess(Void arg0) {
                 GWT.log("successful ping.");
                 _archiveSubmitOnClick(datasets);
-            }
-            @Override
-            public void customFailure(Throwable t) {
-                GWT.log("ping fail: "+ t);
             }
         });
 	}
@@ -1194,15 +1180,11 @@ public class DatasetListPage extends CompositeWithUsername {
 	
 	@UiHandler("deleteButton")
 	void deleteDatasetOnClick(ClickEvent event) {
-	    UploadDashboard.pingService(new OAPAsyncCallback<Void>() {
+	    UploadDashboard.pingService(new OAPAsyncCallback<Void>("session check") {
             @Override
             public void onSuccess(Void arg0) {
                 GWT.log("successful ping.");
                 _deleteDatasetOnClick(event);
-            }
-            @Override
-            public void customFailure(Throwable t) {
-                GWT.log("ping fail: "+ t);
             }
         });
 	}
@@ -1225,7 +1207,7 @@ public class DatasetListPage extends CompositeWithUsername {
 		message += DELETE_DATASET_HTML_EPILOGUE;
 		if ( askDeletePopup == null ) {
 			askDeletePopup = new DashboardAskPopup(DELETE_YES_TEXT, 
-					DELETE_NO_TEXT, QuestionType.WARNING,
+					DELETE_NO_TEXT, MessageInformationType.WARNING,
 					new AsyncCallback<Boolean>() {
 				@Override
 				public void onSuccess(Boolean okay) {
@@ -1253,7 +1235,7 @@ public class DatasetListPage extends CompositeWithUsername {
 	private void continueDeleteDatasets(Boolean deleteMetadata) {
 		UploadDashboard.showWaitCursor();
 		service.deleteDatasets(getUsername(), new TreeSet<String>(selectedDatasets.keySet()), deleteMetadata, 
-				new OAPAsyncCallback<DashboardDatasetList>() {
+				new OAPAsyncCallback<DashboardDatasetList>("delete datasets") {
 			@Override
 			public void onSuccess(DashboardDatasetList datasetList) {
 				if ( getUsername().equals(datasetList.getUsername()) ) {
@@ -1265,26 +1247,16 @@ public class DatasetListPage extends CompositeWithUsername {
 				}
 				UploadDashboard.showAutoCursor();
 			}
-			@Override
-			public void customFailure(Throwable ex) {
-                ex.printStackTrace();
-				UploadDashboard.showFailureMessage(DELETE_DATASET_FAIL_MSG, ex);
-				UploadDashboard.showAutoCursor();
-			}
 		});
 	}
 
 	@UiHandler("showDatasetButton")
 	void addToListOnClick(ClickEvent event) {
-	    UploadDashboard.pingService(new OAPAsyncCallback<Void>() {
+	    UploadDashboard.pingService(new OAPAsyncCallback<Void>("session check") {
             @Override
             public void onSuccess(Void arg0) {
                 GWT.log("successful ping.");
                 _addToListOnClick(event);
-            }
-            @Override
-            public void customFailure(Throwable t) {
-                GWT.log("ping fail: "+ t);
             }
         });
 	}
@@ -1295,7 +1267,7 @@ public class DatasetListPage extends CompositeWithUsername {
 			// Save the currently selected cruises
 			getSelectedDatasets(null);
 			service.filterDatasetsToList(getUsername(), wildDatasetId, 
-					new OAPAsyncCallback<DashboardDatasetList>() {
+					new OAPAsyncCallback<DashboardDatasetList>("filter datasets") {
 				@Override
 				public void onSuccess(DashboardDatasetList cruises) {
 					if ( getUsername().equals(cruises.getUsername()) ) {
@@ -1307,26 +1279,17 @@ public class DatasetListPage extends CompositeWithUsername {
 					}
 					UploadDashboard.showAutoCursor();
 				}
-				@Override
-				public void customFailure(Throwable ex) {
-					UploadDashboard.showFailureMessage(SHOW_DATASET_FAIL_MSG, ex);
-					UploadDashboard.showAutoCursor();
-				}
 			});
 		}
 	}
 
 	@UiHandler("hideDatasetButton")
 	void removeFromListOnClick(ClickEvent event) {
-	    UploadDashboard.pingService(new OAPAsyncCallback<Void>() {
+	    UploadDashboard.pingService(new OAPAsyncCallback<Void>("session check") {
             @Override
             public void onSuccess(Void arg0) {
                 GWT.log("successful ping.");
                 _removeFromListOnClick(event);
-            }
-            @Override
-            public void customFailure(Throwable t) {
-                GWT.log("ping fail: "+ t);
             }
         });
 	}
@@ -1345,7 +1308,7 @@ public class DatasetListPage extends CompositeWithUsername {
 		message += HIDE_DATASET_HTML_EPILOGUE;
 		if ( askRemovePopup == null ) {
 			askRemovePopup = new DashboardAskPopup(HIDE_YES_TEXT, 
-					HIDE_NO_TEXT, DashboardAskPopup.QuestionType.QUESTION,
+					HIDE_NO_TEXT, MessageInformationType.QUESTION,
 					new AsyncCallback<Boolean>() {
 				@Override
 				public void onSuccess(Boolean result) {
@@ -1371,7 +1334,7 @@ public class DatasetListPage extends CompositeWithUsername {
 	private void continueRemoveDatasetsFromList() {
 		UploadDashboard.showWaitCursor();
 		service.removeDatasetsFromList(getUsername(), new TreeSet<String>(selectedDatasets.keySet()), 
-				new OAPAsyncCallback<DashboardDatasetList>() {
+				new OAPAsyncCallback<DashboardDatasetList>("hide datasets") {
 			@Override
 			public void onSuccess(DashboardDatasetList cruises) {
 				if ( getUsername().equals(cruises.getUsername()) ) {
@@ -1381,12 +1344,6 @@ public class DatasetListPage extends CompositeWithUsername {
 					UploadDashboard.showMessage(HIDE_DATASET_FAIL_MSG + 
 							UNEXPECTED_INVALID_DATESET_LIST_MSG);
 				}
-				UploadDashboard.showAutoCursor();
-			}
-			@Override
-			public void customFailure(Throwable ex) {
-                ex.printStackTrace();
-				UploadDashboard.showFailureMessage(HIDE_DATASET_FAIL_MSG, ex);
 				UploadDashboard.showAutoCursor();
 			}
 		});
@@ -2343,7 +2300,7 @@ public class DatasetListPage extends CompositeWithUsername {
         
         if ( !okToSubmit ) {
             errorMsgBldr.append("<br/><br/>Do you still wish to submit to the archive?");
-            UploadDashboard.ask(errorMsgBldr.toString(), "Yes", "No", QuestionType.WARNING, 
+            UploadDashboard.ask(errorMsgBldr.toString(), "Yes", "No", MessageInformationType.WARNING, 
                                 new AsyncCallback<Boolean>() {
                                     @Override
                                     public void onFailure(Throwable t) {
@@ -2531,13 +2488,7 @@ public class DatasetListPage extends CompositeWithUsername {
 		}
 		String localTimestamp = DateTimeFormat.getFormat("yyyy-MM-dd HH:mm Z").format(new Date());
 		UploadDashboard.showWaitCursor();
-		service.suspendDatasets(username, datasetIds, localTimestamp, new OAPAsyncCallback<Void>() {
-			@Override
-			public void customFailure(Throwable caught) {
-				String errMsg = "There was a problem suspending the datasets: " + caught.getMessage();
-				UploadDashboard.showMessage(errMsg);
-				UploadDashboard.showAutoCursor();
-			}
+		service.suspendDatasets(username, datasetIds, localTimestamp, new OAPAsyncCallback<Void>("suspend datasets") {
 			@Override
 			public void onSuccess(Void result) {
 				DatasetListPage.showPage();

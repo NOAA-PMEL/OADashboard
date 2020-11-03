@@ -39,7 +39,6 @@ import com.google.gwt.user.client.ui.RootLayoutPanel;
 import com.google.gwt.user.client.ui.UIObject;
 import com.google.gwt.user.client.ui.VerticalPanel;
 
-import gov.noaa.pmel.dashboard.client.DashboardAskPopup.QuestionType;
 import gov.noaa.pmel.dashboard.shared.DashboardDataset;
 import gov.noaa.pmel.dashboard.shared.DashboardServiceResponse;
 import gov.noaa.pmel.dashboard.shared.DashboardServicesInterface;
@@ -130,6 +129,7 @@ public class UploadDashboard implements EntryPoint, ValueChangeHandler<String> {
 
 	// PopupPanel for displaying messages 
 	private DashboardInfoPopup infoMsgPopup;
+	private DashboardInfoPopup errorMsgPopup;
     
     // popup used when a continuation (follow-on action) is required.
 	private DashboardInfoPopup continueToPopup;
@@ -203,9 +203,9 @@ public class UploadDashboard implements EntryPoint, ValueChangeHandler<String> {
 	}
 
     public static void theresAproblem(String msg, String yesText, String noText, AsyncCallback<Boolean> callback) {
-        theresAproblem(QuestionType.WARNING, msg, yesText, noText, callback);
+        theresAproblem(MessageInformationType.WARNING, msg, yesText, noText, callback);
     }
-    public static void theresAproblem(QuestionType type, String msg, String yesText, String noText, AsyncCallback<Boolean> callback) {
+    public static void theresAproblem(MessageInformationType type, String msg, String yesText, String noText, AsyncCallback<Boolean> callback) {
         DashboardAskPopup dap = new DashboardAskPopup(yesText, noText, type, callback);
         dap.askQuestion(msg);
     }
@@ -338,6 +338,12 @@ public class UploadDashboard implements EntryPoint, ValueChangeHandler<String> {
 					SafeHtmlUtils.htmlEscape(exceptMsg) + "</pre>";
 		UploadDashboard.showMessage(exceptMsg);
 	}
+	public static void showServiceFailureMessage(String htmlMsg) {
+		String exceptMsg = htmlMsg + "<br/>"
+		                    + "Please try again later.<br/>"
+		                    + "If the problem persists, please notify the system administrator at pmel.sdis@noaa.gov";
+		UploadDashboard.showMessage(exceptMsg);
+	}
 
 	/**
 	 * Updates the displayed page by removing any page 
@@ -376,7 +382,7 @@ public class UploadDashboard implements EntryPoint, ValueChangeHandler<String> {
 	}
 	public static void updateCurrentPage(CompositeWithUsername newPage, boolean doPing) {
         if ( doPing ) {
-            pingService(new OAPAsyncCallback<Void>() {
+            pingService(new OAPAsyncCallback<Void>("session check") {
                 @Override
                 public void onSuccess(Void arg0) {
                     _updateCurrentPage(newPage);
@@ -510,7 +516,7 @@ public class UploadDashboard implements EntryPoint, ValueChangeHandler<String> {
             "Your session has expired.<br/>"
             + "You must log in again.<br/>";
 
-    public static void ask(String question, String yesText, String noText, QuestionType type, AsyncCallback<Boolean> callback) {
+    public static void ask(String question, String yesText, String noText, MessageInformationType type, AsyncCallback<Boolean> callback) {
         new DashboardAskPopup(yesText, noText, type, callback).askQuestion(question);
     }
     
@@ -679,15 +685,11 @@ public class UploadDashboard implements EntryPoint, ValueChangeHandler<String> {
     }
     public static void showChangePasswordPopup() {
         GWT.log("pinging before change password");
-        pingService(new OAPAsyncCallback<Void>() {
+        pingService(new OAPAsyncCallback<Void>("session check") {
             @Override
             public void onSuccess(Void arg0) {
                 GWT.log("successful pinging before change password");
                 _showChangePasswordPopup();
-            }
-            @Override
-            public void customFailure(Throwable t) {
-                GWT.log("ping fail: "+ t);
             }
         });
     }
@@ -701,13 +703,7 @@ public class UploadDashboard implements EntryPoint, ValueChangeHandler<String> {
                     if ( sendIt.booleanValue()) {
                         service.changePassword(singleton.currentPage.getUsername(), 
                                                singleton.changePasswordPopup.getCurrentPassword(),
-                                               singleton.changePasswordPopup.getNewPassword(), new AsyncCallback<DashboardServiceResponse>() {
-                            @Override
-                            public void onFailure(Throwable arg0) {
-                                GWT.log("Change Password failed: " + arg0);
-                                showFailureMessage("There was an error changing your password.", arg0);
-                            }
-
+                                               singleton.changePasswordPopup.getNewPassword(), new OAPAsyncCallback<DashboardServiceResponse>("change password") {
                             @Override
                             public void onSuccess(DashboardServiceResponse changed) {
                                 GWT.log("Change Password success:" + changed);
@@ -748,5 +744,31 @@ public class UploadDashboard implements EntryPoint, ValueChangeHandler<String> {
      */
     public static void setAppBuildVersion(String version) {
         buildVersion = version;
+    }
+    /**
+     * @param errorMsg
+     */
+    public static void showErrorMessage(String errorMsg) {
+        showErrorMessage(errorMsg, MessageInformationType.WARNING);
+    }
+    public static void showErrorMessage(String errorMsg, MessageInformationType type) {
+        getSingleton();
+        if ( singleton.errorMsgPopup == null ) {
+            singleton.errorMsgPopup = new DashboardInfoPopup();
+        }
+        singleton.errorMsgPopup.setInfoMessage(errorMsg);
+        singleton.errorMsgPopup.setMessageType(type);
+        singleton.errorMsgPopup.showCentered();
+    }
+    /**
+     * @param operation
+     * @param error
+     */
+    public static void serviceException(String operation, Throwable error) {
+        String errorMsg = "There was an error processing the " + operation + " request.<br/>"
+		                    + "Please try again later.<br/>"
+		                    + "If the problem persists, please notify the system administrator at pmel.sdis@noaa.gov";
+		UploadDashboard.showErrorMessage(errorMsg);
+        
     }
  }

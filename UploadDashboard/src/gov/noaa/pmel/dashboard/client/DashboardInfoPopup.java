@@ -11,6 +11,7 @@ import com.google.gwt.uibinder.client.UiHandler;
 import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.HTML;
+import com.google.gwt.user.client.ui.Image;
 import com.google.gwt.user.client.ui.PopupPanel;
 import com.google.gwt.user.client.ui.UIObject;
 import com.google.gwt.user.client.ui.Widget;
@@ -30,6 +31,7 @@ public class DashboardInfoPopup extends Composite {
 	private static DashboardInfoPopupUiBinder uiBinder = 
 			GWT.create(DashboardInfoPopupUiBinder.class);
 
+    @UiField Image msgTypeIcon;
 	@UiField HTML infoHtml;
 	@UiField Button dismissButton;
 
@@ -51,6 +53,7 @@ public class DashboardInfoPopup extends Composite {
 		dismissButton.setText(DISMISS_TEXT);
 		parentPanel = new PopupPanel(false);
 		parentPanel.setWidget(this);
+        msgTypeIcon.setVisible(false);
 	}
 
 	DashboardInfoPopup(String htmlMsg, OAPAsyncCallback<?> continuation) {
@@ -63,6 +66,22 @@ public class DashboardInfoPopup extends Composite {
         this.dismissButton.setText(dismissBtnText);
         this.continuation = continuation;
 	}
+    
+	DashboardInfoPopup(String htmlMsg, String dismissBtnText, 
+	                   MessageInformationType msgType, OAPAsyncCallback<?> continuation) {
+        this(htmlMsg, dismissBtnText, continuation);
+        setMessageType(msgType);
+	}
+    
+	void setMessageType(MessageInformationType msgType) {
+        if ( msgType != null ) {
+            msgTypeIcon.setVisible(true);
+            msgTypeIcon.setUrl(msgType.iconSrc());
+        } else {
+            msgTypeIcon.setVisible(false);
+        }
+	}
+    
 	/**
 	 * @param htmlMessage
 	 * 		the unchecked HTML message to display.

@@ -45,7 +45,6 @@ import com.google.gwt.view.client.ProvidesKey;
 import com.google.gwt.view.client.Range;
 import com.google.gwt.view.client.SingleSelectionModel;
 
-import gov.noaa.pmel.dashboard.client.DashboardAskPopup.QuestionType;
 import gov.noaa.pmel.dashboard.client.UploadDashboard.PagesEnum;
 import gov.noaa.pmel.dashboard.shared.ADCMessage;
 import gov.noaa.pmel.dashboard.shared.ADCMessageList;
@@ -312,7 +311,7 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
                 UploadDashboard.debugLog("Getting new data range:" + range);
 				service.getDataWithRowNum(getUsername(), cruise.getDatasetId(), 
 						range.getStart(), range.getLength(), 
-						new OAPAsyncCallback<ArrayList<ArrayList<String>>>() {
+						new OAPAsyncCallback<ArrayList<ArrayList<String>>>("get data rows") {
 					@Override
 					public void onSuccess(ArrayList<ArrayList<String>> newData) {
 						int actualStart;
@@ -326,11 +325,6 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 							actualStart = range.getStart();
 						updateRowData(actualStart, newData);
 						updateScroll(true);
-						UploadDashboard.showAutoCursor();
-					}
-					@Override
-					public void customFailure(Throwable ex) {
-						UploadDashboard.showFailureMessage(MORE_DATA_FAIL_MSG, ex);
 						UploadDashboard.showAutoCursor();
 					}
 				});
@@ -471,7 +465,7 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
         singleton.setDatasetIds(cruises);
 		UploadDashboard.showWaitCursor();
 		service.getDataColumnSpecs(singleton.getUsername(), cruises.iterator().next().getDatasetId(), 
-								new OAPAsyncCallback<TypesDatasetDataPair>() {
+								new OAPAsyncCallback<TypesDatasetDataPair>("get data column information") {
 			@Override
 			public void onSuccess(TypesDatasetDataPair cruiseSpecs) {
 				if ( cruiseSpecs != null ) {
@@ -483,17 +477,6 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 						" (unexpected null cruise column specificiations)");
 				}
 				UploadDashboard.showAutoCursor();
-			}
-            
-			@Override
-			public void customFailure(Throwable ex) {
-				String exMsg = ex.getMessage();
-				if ( exMsg.indexOf("SESSION HAS EXPIRED") >= 0 ) {
-					UploadDashboard.showMessage("Your session has expired.<br/><br/>Please log in again.");
-				} else {
-					UploadDashboard.showFailureMessage(GET_COLUMN_SPECS_FAIL_MSG, ex);
-					UploadDashboard.showAutoCursor();
-				}
 			}
 		});
 	}
@@ -786,7 +769,7 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 
 	@UiHandler("doneButton")
 	void doneOnClick(ClickEvent event) {
-        UploadDashboard.pingService(new OAPAsyncCallback<Void>() {
+        UploadDashboard.pingService(new OAPAsyncCallback<Void>("session check") {
             @Override
             public void onSuccess(Void nothing) {
                 _doneOnClick(event);
@@ -826,17 +809,9 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 			// Put up the wait cursor and send the rest of the cruises through the sanity checker
 			UploadDashboard.showWaitCursor();
 			expocodes.remove(0);
-			service.updateDataColumns(getUsername(), expocodes, new OAPAsyncCallback<Void>() {
+			service.updateDataColumns(getUsername(), expocodes, new OAPAsyncCallback<Void>("update data column specification") {
 				@Override
 				public void onSuccess(Void result) {
-					// Go to the list of cruises without comment; return to the normal cursor
-					DatasetListPage.showPage();
-					UploadDashboard.showAutoCursor();
-					return;
-				}
-				@Override
-				public void customFailure(Throwable caught) {
-                    Window.alert("Error updating column specifications: " + caught.toString());
 					// Go to the list of cruises without comment; return to the normal cursor
 					DatasetListPage.showPage();
 					UploadDashboard.showAutoCursor();
@@ -889,7 +864,7 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 			UploadDashboard.showMessage(DISABLED_SUBMIT_HOVER_HELP);
 			return;
 		}
-        UploadDashboard.pingService(new OAPAsyncCallback<Void>() {
+        UploadDashboard.pingService(new OAPAsyncCallback<Void>("session check") {
             @Override
             public void onSuccess(Void nothing) {
                 _submitOnClick(event);
@@ -1107,7 +1082,7 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 		// This update invokes the SanityChecker on the data and
 		// the results are then reported back to this page.
 		service.updateDataColumnSpecs(getUsername(), cruise, 
-				new OAPAsyncCallback<TypesDatasetDataPair>() {
+				new OAPAsyncCallback<TypesDatasetDataPair>("update data column specifications") {
 			@Override
 			public void onSuccess(TypesDatasetDataPair tddp) {
 				if ( tddp == null ) {
@@ -1127,7 +1102,7 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 					 status.startsWith(DashboardUtils.CHECK_STATUS_CRITICAL_ERRORS_PREFIX) ||
 					 status.equals(DashboardUtils.CHECK_STATUS_UNACCEPTABLE) ) {
 					// the sanity checker had serious problems
-					UploadDashboard.theresAproblem(QuestionType.CRITICAL, 
+					UploadDashboard.theresAproblem(MessageInformationType.CRITICAL, 
 					                               buildFailureMessage(SANITY_CHECK_FAIL_MSG, ddd), 
 					                               "Show Errors / Warnings", "Dismiss", 
 					                               new AsyncCallback<Boolean>() {
@@ -1181,12 +1156,6 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 				}
 				updateDatasetDataCheckMessages(tddp.getMsgList());
 				updateDatasetUserQcFlagMessages(ddd);
-				// Show the normal cursor
-				UploadDashboard.showAutoCursor();
-			}
-            @Override
-			public void customFailure(Throwable ex) {
-				UploadDashboard.showFailureMessage(SUBMIT_FAIL_MSG, ex);
 				// Show the normal cursor
 				UploadDashboard.showAutoCursor();
 			}
@@ -1261,7 +1230,7 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 			}
 		}
 		if ( hasChanged ) {
-            UploadDashboard.pingService(new OAPAsyncCallback<Void>() {
+            UploadDashboard.pingService(new OAPAsyncCallback<Void>("session check") {
                 @Override
                 public void onSuccess(Void nothing) {
         			doSave();
@@ -1279,7 +1248,7 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 		// This update invokes the SanityChecker on the data and
 		// the results are then reported back to this page.
 		service.saveDataColumnSpecs(getUsername(), cruise, 
-				new OAPAsyncCallback<DashboardDatasetData>() {
+				new OAPAsyncCallback<DashboardDatasetData>("save data column specification") {
 			@Override
 			public void onSuccess(DashboardDatasetData specs) {
 				if ( specs == null ) {
@@ -1288,12 +1257,6 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 					UploadDashboard.showMessage("Data column definitions saved.");
 					updateDatasetColumnSpecs(specs);
 				}
-				UploadDashboard.showAutoCursor();
-			}
-			@Override
-			public void customFailure(Throwable ex) {
-				UploadDashboard.showFailureMessage(SAVE_FAIL_MSG, ex);
-				// Show the normal cursor
 				UploadDashboard.showAutoCursor();
 			}
 		});

@@ -469,7 +469,7 @@ public class SubmitForQCPage extends CompositeWithUsername implements DataSubmis
 		// Submit the dataset
 		UploadDashboard.showWaitCursor();
 		service.submitDatasetsForQC(getUsername(), expocodes, archiveStatus, 
-				localTimestamp, repeatSend, new OAPAsyncCallback<Void>() {
+				localTimestamp, repeatSend, new OAPAsyncCallback<Void>("submit datasets for QC") {
 			@Override
 			public void onSuccess(Void result) {
 				// Success - go back to the cruise list page
@@ -477,12 +477,11 @@ public class SubmitForQCPage extends CompositeWithUsername implements DataSubmis
 				UploadDashboard.showAutoCursor();
 			}
 			@Override
-			public void customFailure(Throwable ex) {
+			public void handleException(Throwable ex) {
 				// Failure, so show fail message
 				// But still go back to the cruise list page since some may have succeeded
-				UploadDashboard.showFailureMessage(SUBMIT_FAILURE_MSG_START + " for QC: ", ex);
+                super.handleException(ex);
 				DatasetListPage.showPage();
-				UploadDashboard.showAutoCursor();
 			}
 		});
 	}

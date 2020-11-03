@@ -42,10 +42,12 @@ import gov.noaa.pmel.dashboard.programs.CloneSubmission;
 import gov.noaa.pmel.dashboard.server.model.User;
 import gov.noaa.pmel.dashboard.server.submission.status.StatusRecord;
 import gov.noaa.pmel.dashboard.server.submission.status.SubmissionRecord;
+import gov.noaa.pmel.dashboard.server.util.Notifications;
 import gov.noaa.pmel.dashboard.shared.DashboardDataset;
 import gov.noaa.pmel.dashboard.shared.DashboardDatasetData;
 import gov.noaa.pmel.dashboard.shared.DashboardDatasetList;
 import gov.noaa.pmel.dashboard.shared.DashboardMetadata;
+import gov.noaa.pmel.dashboard.shared.DashboardServiceException;
 import gov.noaa.pmel.dashboard.shared.DashboardServiceResponse;
 import gov.noaa.pmel.dashboard.shared.DashboardServiceResponse.DashboardServiceResponseBuilder;
 import gov.noaa.pmel.dashboard.shared.DashboardServicesInterface;
@@ -53,10 +55,8 @@ import gov.noaa.pmel.dashboard.shared.DashboardUtils;
 import gov.noaa.pmel.dashboard.shared.DataColumnType;
 import gov.noaa.pmel.dashboard.shared.MetadataPreviewInfo;
 import gov.noaa.pmel.dashboard.shared.NotFoundException;
-import gov.noaa.pmel.dashboard.shared.PreviewPlotImage;
 import gov.noaa.pmel.dashboard.shared.PreviewPlotResponse;
 import gov.noaa.pmel.dashboard.shared.PreviewTab;
-import gov.noaa.pmel.dashboard.shared.SessionException;
 import gov.noaa.pmel.dashboard.shared.ADCMessageList;
 import gov.noaa.pmel.dashboard.shared.TypesDatasetDataPair;
 import gov.noaa.pmel.tws.util.ApplicationConfiguration;
@@ -117,8 +117,13 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
     @Override
     public void submitFeedback(String pageUsername, String type, String message) {
         validateRequest(pageUsername);
-        FeedbackHandler.logFeedbackMessage(pageUsername, type, message);
-        FeedbackHandler.notifyFeedbackMessage(pageUsername, type, message);
+        try {
+            FeedbackHandler.logFeedbackMessage(pageUsername, type, message);
+            FeedbackHandler.notifyFeedbackMessage(pageUsername, type, message);
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+        }
     }
 
     @Override
@@ -175,20 +180,28 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 	}
 
 	@Override
-	public DashboardServiceResponse<DashboardDatasetList> getDatasetList(String pageUsername) throws IllegalArgumentException, SessionException {
+	public DashboardServiceResponse<DashboardDatasetList> getDatasetList(String pageUsername) 
+	        throws IllegalArgumentException 
+	{
 		// Get the dashboard data store and current username
         logger.debug(pageUsername);
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
-		DashboardDatasetList datasetList = configStore.getUserFileHandler().getDatasetListing(username);
-		logger.info("dataset list returned for " + username);
-        String buildVersion = getBuildVersion();
-        DashboardServiceResponse<DashboardDatasetList> response = 
-                DashboardServiceResponse.<DashboardDatasetList>builder()
-                    .response(datasetList)
-                    .version(buildVersion)
-                    .build();
-		return response;
+        try {
+    		DashboardDatasetList datasetList = configStore.getUserFileHandler().getDatasetListing(username);
+    		logger.info("dataset list returned for " + username);
+            String version = getBuildVersion();
+            DashboardServiceResponse<DashboardDatasetList> response = 
+                    DashboardServiceResponse.<DashboardDatasetList>builder()
+                        .response(datasetList)
+                        .version(version)
+                        .build();
+    		return response;
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("get dataset list", t);
+        }
 	}
 
 	/**
@@ -210,13 +223,15 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 			throw new IllegalArgumentException("Invalid user request");
         
         try {
-        CloneSubmission.Clone(submissionRecordId, pageUsername, copyAssociatedFiles);
-		DashboardDatasetList datasetList = configStore.getUserFileHandler().getDatasetListing(username);
-		logger.info("dataset list returned for " + username);
-        
-		return datasetList;
-        } catch (IOException iox) {
-            throw new IllegalArgumentException(iox);
+            CloneSubmission.Clone(submissionRecordId, pageUsername, copyAssociatedFiles);
+    		DashboardDatasetList datasetList = configStore.getUserFileHandler().getDatasetListing(username);
+    		logger.info("dataset list returned for " + username);
+            
+    		return datasetList;
+        } catch (Throwable iox) {
+            logger.warn(iox, iox);
+            Notifications.Alert("SDIS Exception", iox);
+            throw new DashboardServiceException("Error cloning submission record", iox);
         }
     }
     /**
@@ -246,19 +261,25 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
 
-		DataFileHandler dataHandler = configStore.getDataFileHandler();
-		// Delete each of the datesets in the given set
-		for ( String datasetId : idsSet ) {
-			dataHandler.deleteDatasetFiles(datasetId, username, deleteMetadata);
-			// IllegalArgumentException for other problems escape as-is
-			logger.info("dataset " + datasetId + " deleted by " + username);
-		}
-
-		// Return the current list of datasets, which should 
-		// detect the missing datasets and update itself
-		DashboardDatasetList datasetList = configStore.getUserFileHandler().getDatasetListing(username);
-		logger.info("dataset list returned for " + username);
-		return datasetList;
+        try {
+    		DataFileHandler dataHandler = configStore.getDataFileHandler();
+    		// Delete each of the datesets in the given set
+    		for ( String datasetId : idsSet ) {
+    			dataHandler.deleteDatasetFiles(datasetId, username, deleteMetadata);
+    			// IllegalArgumentException for other problems escape as-is
+    			logger.info("dataset " + datasetId + " deleted by " + username);
+    		}
+    
+    		// Return the current list of datasets, which should 
+    		// detect the missing datasets and update itself
+    		DashboardDatasetList datasetList = configStore.getUserFileHandler().getDatasetListing(username);
+    		logger.info("dataset list returned for " + username);
+    		return datasetList;
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error deleting datasets", t);
+        }
 	}
 
 	@Override
@@ -268,11 +289,17 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
 
-		// Add the datasets to the user's list and return the updated list
-		DashboardDatasetList cruiseList = configStore.getUserFileHandler()
-				.getFilteredDatasets(wildDatasetId, username);
-		logger.info("filtered datasets " + wildDatasetId + " for " + username + ": " + cruiseList);
-		return cruiseList;
+        try {
+    		// Add the datasets to the user's list and return the updated list
+    		DashboardDatasetList cruiseList = configStore.getUserFileHandler()
+    				.getFilteredDatasets(wildDatasetId, username);
+    		logger.info("filtered datasets " + wildDatasetId + " for " + username + ": " + cruiseList);
+    		return cruiseList;
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error filtering datasets", t);
+        }
 	}
 
 	@Override
@@ -282,11 +309,17 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
 
-		// Add the datasets to the user's list and return the updated list
-		DashboardDatasetList cruiseList = configStore.getUserFileHandler()
-				.addDatasetsToListing(wildDatasetId, username);
-		logger.info("added datasets " + wildDatasetId + " for " + username);
-		return cruiseList;
+        try {
+    		// Add the datasets to the user's list and return the updated list
+    		DashboardDatasetList cruiseList = configStore.getUserFileHandler()
+    				.addDatasetsToListing(wildDatasetId, username);
+    		logger.info("added datasets " + wildDatasetId + " for " + username);
+    		return cruiseList;
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error adding datasets", t);
+        }
 	}
 
 	@Override
@@ -296,11 +329,17 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
 
-		// Remove the datasets from the user's list and return the updated list
-		DashboardDatasetList datasetList = configStore.getUserFileHandler()
-				.removeDatasetsFromListing(idsSet, username);
-		logger.info("removed datasets " + idsSet.toString() + " for " + username);
-		return datasetList;
+        try {
+    		// Remove the datasets from the user's list and return the updated list
+    		DashboardDatasetList datasetList = configStore.getUserFileHandler()
+    				.removeDatasetsFromListing(idsSet, username);
+    		logger.info("removed datasets " + idsSet.toString() + " for " + username);
+    		return datasetList;
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error removing datasets", t);
+        }
 	}
 
 	@Override
@@ -308,32 +347,38 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 			TreeSet<String> idsSet, String newOwner) throws IllegalArgumentException {
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
-		// Get the dashboard username of the new owner
-		String newUsername;
-		if ( Users.validateUser(newOwner) ) {
-			// dashboard username was given
-			newUsername = newOwner;
-		}
-		else {
-			// actual name given? // XXX This won't work.
-			try {
-                User newUser = Users.getUser(newOwner);
-                newUsername = newUser.username();
-			} catch (Exception ex) {
-				newUsername = null;
-			}
-			if ( (newUsername == null) || ! Users.validateUser(newUsername) ) 
-				throw new IllegalArgumentException("Unknown dashboard user " + newOwner);
-		}
-		// Change the owner of the datasets
-		DatasetModifier modifier = new DatasetModifier(configStore);
-		for ( String datasetId : idsSet ) {
-			modifier.changeDatasetOwner(datasetId, newUsername);
-			logger.info("changed owner of " + datasetId + " to " + newUsername);
-		}
-		// Return the updated list of cruises for this user
-		DashboardDatasetList datasetList = configStore.getUserFileHandler().getDatasetListing(pageUsername);
-		return datasetList;
+        try {
+    		// Get the dashboard username of the new owner
+    		String newUsername;
+    		if ( Users.validateUser(newOwner) ) {
+    			// dashboard username was given
+    			newUsername = newOwner;
+    		}
+    		else {
+    			// actual name given? // XXX This won't work.
+    			try {
+                    User newUser = Users.getUser(newOwner);
+                    newUsername = newUser.username();
+    			} catch (Exception ex) {
+    				newUsername = null;
+    			}
+    			if ( (newUsername == null) || ! Users.validateUser(newUsername) ) 
+    				throw new IllegalArgumentException("Unknown dashboard user " + newOwner);
+    		}
+    		// Change the owner of the datasets
+    		DatasetModifier modifier = new DatasetModifier(configStore);
+    		for ( String datasetId : idsSet ) {
+    			modifier.changeDatasetOwner(datasetId, newUsername);
+    			logger.info("changed owner of " + datasetId + " to " + newUsername);
+    		}
+    		// Return the updated list of cruises for this user
+    		DashboardDatasetList datasetList = configStore.getUserFileHandler().getDatasetListing(pageUsername);
+    		return datasetList;
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error changing dataset owner", t);
+        }
 	}
 
 	@Override
@@ -343,15 +388,21 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
 
-		// Create the set of updated dataset information to return
-		DataFileHandler dataHandler = configStore.getDataFileHandler();
-		DashboardDatasetList datasetList = new DashboardDatasetList(username);
-		datasetList.setManager(Users.isManager(username));
-		for ( String datasetId : idsSet ) {
-			datasetList.put(datasetId, dataHandler.getDatasetFromInfoFile(datasetId));
-		}
-		logger.info("returned updated dataset information for " + username);
-		return datasetList;
+        try {
+    		// Create the set of updated dataset information to return
+    		DataFileHandler dataHandler = configStore.getDataFileHandler();
+    		DashboardDatasetList datasetList = new DashboardDatasetList(username);
+    		datasetList.setManager(Users.isManager(username));
+    		for ( String datasetId : idsSet ) {
+    			datasetList.put(datasetId, dataHandler.getDatasetFromInfoFile(datasetId));
+    		}
+    		logger.info("returned updated dataset information for " + username);
+    		return datasetList;
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error getting updated datasets", t);
+        }
 	}
 
 	@Override
@@ -361,54 +412,60 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
 
-		DataFileHandler dataHandler = configStore.getDataFileHandler();
-		DashboardDataset dataset = dataHandler.getDatasetFromInfoFile(datasetId);
-
-		// Get the current metadata documents for the cruise
-		MetadataFileHandler mdataHandler = configStore.getMetadataFileHandler();
-		// XXX TODO: OME_FILENAME check
-		if ( MetadataFileHandler.metadataFilename(datasetId).equals(deleteFilename) ) {
-			// Remove the OME XML stub file
-			if ( ! Boolean.TRUE.equals(dataset.isEditable()) ) 
-				throw new IllegalArgumentException("Cannot delete the metadata for a submitted dataset");
-		}
-//		else if ( DashboardUtils.PI_OME_FILENAME.equals(deleteFilename) ) {
-//			// No more PI-provided OME metadata for this cruise
-//			dataset.setMdTimestamp(null);
-//		}
-		else {
-			// Directly modify the additional documents list in this dataset
-			TreeSet<String> addlDocs = dataset.getAddlDocs();
-			// Find this additional document for this cruise
-			String titleToRemove = null;
-			for ( String docTitle : addlDocs ) {
-				String name = DashboardMetadata.splitAddlDocsTitle(docTitle)[0];
-				if ( name.equals(deleteFilename) ) {
-					titleToRemove = docTitle;
-					break;
-				}
-			}
-			if ( (titleToRemove == null) || ! addlDocs.remove(titleToRemove) )
-				throw new IllegalArgumentException("Document " + deleteFilename + 
-						" is not associated with dataset " + datasetId);
-		}
-		mdataHandler.deleteMetadataFile(username, datasetId, deleteFilename);
-
-		logger.info("deleted metadata " + deleteFilename + 
-				" from " + datasetId + " for " + username);
-
-		// Save the updated cruise
-		dataHandler.saveDatasetInfoToFile(dataset, "Removed metadata document " + 
-									deleteFilename + " from dataset " + datasetId);
-
-		// Create the set of updated dataset information to return
-		DashboardDatasetList datasetList = new DashboardDatasetList(username);
-		datasetList.setManager(Users.isManager(username));
-		for ( String id : allIds ) {
-			datasetList.put(id, dataHandler.getDatasetFromInfoFile(id));
-		}
-		logger.info("returned updated dataset information for " + username);
-		return datasetList;
+        try {
+    		DataFileHandler dataHandler = configStore.getDataFileHandler();
+    		DashboardDataset dataset = dataHandler.getDatasetFromInfoFile(datasetId);
+    
+    		// Get the current metadata documents for the cruise
+    		MetadataFileHandler mdataHandler = configStore.getMetadataFileHandler();
+    		// XXX TODO: OME_FILENAME check
+    		if ( MetadataFileHandler.metadataFilename(datasetId).equals(deleteFilename) ) {
+    			// Remove the OME XML stub file
+    			if ( ! Boolean.TRUE.equals(dataset.isEditable()) ) 
+    				throw new IllegalArgumentException("Cannot delete the metadata for a submitted dataset");
+    		}
+    //		else if ( DashboardUtils.PI_OME_FILENAME.equals(deleteFilename) ) {
+    //			// No more PI-provided OME metadata for this cruise
+    //			dataset.setMdTimestamp(null);
+    //		}
+    		else {
+    			// Directly modify the additional documents list in this dataset
+    			TreeSet<String> addlDocs = dataset.getAddlDocs();
+    			// Find this additional document for this cruise
+    			String titleToRemove = null;
+    			for ( String docTitle : addlDocs ) {
+    				String name = DashboardMetadata.splitAddlDocsTitle(docTitle)[0];
+    				if ( name.equals(deleteFilename) ) {
+    					titleToRemove = docTitle;
+    					break;
+    				}
+    			}
+    			if ( (titleToRemove == null) || ! addlDocs.remove(titleToRemove) )
+    				throw new IllegalArgumentException("Document " + deleteFilename + 
+    						" is not associated with dataset " + datasetId);
+    		}
+    		mdataHandler.deleteMetadataFile(username, datasetId, deleteFilename);
+    
+    		logger.info("deleted metadata " + deleteFilename + 
+    				" from " + datasetId + " for " + username);
+    
+    		// Save the updated cruise
+    		dataHandler.saveDatasetInfoToFile(dataset, "Removed metadata document " + 
+    									deleteFilename + " from dataset " + datasetId);
+    
+    		// Create the set of updated dataset information to return
+    		DashboardDatasetList datasetList = new DashboardDatasetList(username);
+    		datasetList.setManager(Users.isManager(username));
+    		for ( String id : allIds ) {
+    			datasetList.put(id, dataHandler.getDatasetFromInfoFile(id));
+    		}
+    		logger.info("returned updated dataset information for " + username);
+    		return datasetList;
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error deleting additional documents", t);
+        }
 	}
 
 	@Override
@@ -418,37 +475,43 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
 
-		// Get the list of known user-provided data column types
-		KnownDataTypes knownUserTypes = configStore.getKnownUserDataTypes();
-		if ( knownUserTypes == null )
-			throw new IllegalArgumentException("unexpected missing list of all known data column types");
-		TreeSet<DashDataType<?>> knownTypesSet = knownUserTypes.getKnownTypesSet();
-		if ( knownTypesSet.isEmpty() )
-			throw new IllegalArgumentException("unexpected empty list of all known data column types");
-		ArrayList<DataColumnType> knownTypesList = new ArrayList<DataColumnType>(knownTypesSet.size());
-		for ( DashDataType<?> dtype : knownTypesSet )
-			knownTypesList.add(dtype.dataColumnType());
-
-        DataFileHandler dataFileHandler = configStore.getDataFileHandler();
-		// Get the cruise with the first maximum-needed number of rows
-        DashboardDatasetData dataset = dataFileHandler
-				.getDatasetDataFromFiles(datasetId, 0, DashboardUtils.MAX_ROWS_PER_GRID_PAGE);
-		if ( dataset == null )
-			throw new IllegalArgumentException(datasetId + " does not exist");
-
-		TypesDatasetDataPair typesAndDataset = new TypesDatasetDataPair();
-		typesAndDataset.setAllKnownTypes(knownTypesList);
-		typesAndDataset.setDatasetData(dataset);
-
-		// So we can show the error message on the page.
-		ADCMessageList msgs = getDataMessages(pageUsername, datasetId);
-		if ( msgs != null ) {
-			typesAndDataset.setMsgList(msgs);
-		}
-		logger.info("data columns specs returned for " + 
-				datasetId + " for " + username);
-		// Return the cruise with the partial data
-		return typesAndDataset;
+        try {
+    		// Get the list of known user-provided data column types
+    		KnownDataTypes knownUserTypes = configStore.getKnownUserDataTypes();
+    		if ( knownUserTypes == null )
+    			throw new IllegalArgumentException("unexpected missing list of all known data column types");
+    		TreeSet<DashDataType<?>> knownTypesSet = knownUserTypes.getKnownTypesSet();
+    		if ( knownTypesSet.isEmpty() )
+    			throw new IllegalArgumentException("unexpected empty list of all known data column types");
+    		ArrayList<DataColumnType> knownTypesList = new ArrayList<DataColumnType>(knownTypesSet.size());
+    		for ( DashDataType<?> dtype : knownTypesSet )
+    			knownTypesList.add(dtype.dataColumnType());
+    
+            DataFileHandler dataFileHandler = configStore.getDataFileHandler();
+    		// Get the cruise with the first maximum-needed number of rows
+            DashboardDatasetData dataset = dataFileHandler
+    				.getDatasetDataFromFiles(datasetId, 0, DashboardUtils.MAX_ROWS_PER_GRID_PAGE);
+    		if ( dataset == null )
+    			throw new IllegalArgumentException(datasetId + " does not exist");
+    
+    		TypesDatasetDataPair typesAndDataset = new TypesDatasetDataPair();
+    		typesAndDataset.setAllKnownTypes(knownTypesList);
+    		typesAndDataset.setDatasetData(dataset);
+    
+    		// So we can show the error message on the page.
+    		ADCMessageList msgs = getDataMessages(pageUsername, datasetId);
+    		if ( msgs != null ) {
+    			typesAndDataset.setMsgList(msgs);
+    		}
+    		logger.info("data columns specs returned for " + 
+    				datasetId + " for " + username);
+    		// Return the cruise with the partial data
+    		return typesAndDataset;
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error getting data column specifications", t);
+        }
 	}
 
     @Override
@@ -458,31 +521,37 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
 
-		int myFirstRow = firstRow;
-		if ( myFirstRow < 0 )
-			myFirstRow = 0;
-		// Get only the desired data from the dataset
-		DashboardDatasetData dataset = configStore.getDataFileHandler()
-									.getDatasetDataFromFiles(datasetId, myFirstRow, numRows);
-		if ( dataset == null )
-			throw new IllegalArgumentException(datasetId + " does not exist");
-		ArrayList<ArrayList<String>> dataWithRowNums = dataset.getDataValues();
-		ArrayList<Integer> rowNums = dataset.getRowNums();
-		// Modify the list in this DashboardDatasetData since it is then thrown away
-		int k = 0;
-		for ( ArrayList<String> rowData : dataWithRowNums ) {
-			rowData.add(0, rowNums.get(k).toString());
-			k++;
-		}
-		int myLastRow = myFirstRow + dataWithRowNums.size() - 1;
-		logger.info(datasetId + " dataset data [" + Integer.toString(myFirstRow) + 
-				" - " + Integer.toString(myLastRow) + "] returned for " + username);
-		if ( logger.isTraceEnabled()) {
-			for (k = 0; k < dataWithRowNums.size(); k++) {
-				logger.debug("  data[" + Integer.toString(k) + "]=" + dataWithRowNums.get(k).toString());
-			}
-		}
-		return dataWithRowNums;
+        try {
+    		int myFirstRow = firstRow;
+    		if ( myFirstRow < 0 )
+    			myFirstRow = 0;
+    		// Get only the desired data from the dataset
+    		DashboardDatasetData dataset = configStore.getDataFileHandler()
+    									.getDatasetDataFromFiles(datasetId, myFirstRow, numRows);
+    		if ( dataset == null )
+    			throw new IllegalArgumentException(datasetId + " does not exist");
+    		ArrayList<ArrayList<String>> dataWithRowNums = dataset.getDataValues();
+    		ArrayList<Integer> rowNums = dataset.getRowNums();
+    		// Modify the list in this DashboardDatasetData since it is then thrown away
+    		int k = 0;
+    		for ( ArrayList<String> rowData : dataWithRowNums ) {
+    			rowData.add(0, rowNums.get(k).toString());
+    			k++;
+    		}
+    		int myLastRow = myFirstRow + dataWithRowNums.size() - 1;
+    		logger.info(datasetId + " dataset data [" + Integer.toString(myFirstRow) + 
+    				" - " + Integer.toString(myLastRow) + "] returned for " + username);
+    		if ( logger.isTraceEnabled()) {
+    			for (k = 0; k < dataWithRowNums.size(); k++) {
+    				logger.debug("  data[" + Integer.toString(k) + "]=" + dataWithRowNums.get(k).toString());
+    			}
+    		}
+    		return dataWithRowNums;
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error retrieving dataset data", t);
+        }
 	}
 
 	@Override
@@ -492,136 +561,144 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
 
-		// Retrieve all the current cruise data
-		DashboardDatasetData dataset = configStore.getDataFileHandler()
-						.getDatasetDataFromFiles(newSpecs.getDatasetId(), 0, -1);
-		if ( ! dataset.isEditable() )
-			throw new IllegalArgumentException(newSpecs.getDatasetId() + 
-					" has been submitted for QC; data column types cannot be modified.");
-
-		// Revise the data column types and units 
-		if ( newSpecs.getDataColTypes().size() != dataset.getDataColTypes().size() )
-			throw new IllegalArgumentException("Unexpected number of data columns (" +
-					newSpecs.getDataColTypes().size() + " instead of " + 
-					dataset.getDataColTypes().size());
-		dataset.setDataColTypes(newSpecs.getDataColTypes());
-
-		// Save and commit the updated data columns
-		configStore.getDataFileHandler().saveDatasetInfoToFile(dataset, 
-				"Data column types, units, and missing values for " + 
-				dataset.getDatasetId() + " updated by " + username);
-		// Update the user-specific data column names to types, units, and missing values 
-		configStore.getUserFileHandler().updateUserDataColumnTypes(dataset, username);
-		if ( ! username.equals(dataset.getOwner()) )
-			configStore.getUserFileHandler().updateUserDataColumnTypes(dataset, dataset.getOwner());
-		
-		logger.info("data columns specs saved for " + 
-				dataset.getDatasetId() + " by " + username);
-		
-		return dataset;
+        try {
+    		// Retrieve all the current cruise data
+    		DashboardDatasetData dataset = configStore.getDataFileHandler()
+    						.getDatasetDataFromFiles(newSpecs.getDatasetId(), 0, -1);
+    		if ( ! dataset.isEditable() )
+    			throw new IllegalArgumentException(newSpecs.getDatasetId() + 
+    					" has been submitted for QC; data column types cannot be modified.");
+    
+    		// Revise the data column types and units 
+    		if ( newSpecs.getDataColTypes().size() != dataset.getDataColTypes().size() )
+    			throw new IllegalArgumentException("Unexpected number of data columns (" +
+    					newSpecs.getDataColTypes().size() + " instead of " + 
+    					dataset.getDataColTypes().size());
+    		dataset.setDataColTypes(newSpecs.getDataColTypes());
+    
+    		// Save and commit the updated data columns
+    		configStore.getDataFileHandler().saveDatasetInfoToFile(dataset, 
+    				"Data column types, units, and missing values for " + 
+    				dataset.getDatasetId() + " updated by " + username);
+    		// Update the user-specific data column names to types, units, and missing values 
+    		configStore.getUserFileHandler().updateUserDataColumnTypes(dataset, username);
+    		if ( ! username.equals(dataset.getOwner()) )
+    			configStore.getUserFileHandler().updateUserDataColumnTypes(dataset, dataset.getOwner());
+    		
+    		logger.info("data columns specs saved for " + 
+    				dataset.getDatasetId() + " by " + username);
+    		
+    		return dataset;
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error saving data column specifications", t);
+        }
 	}
 	
 	@Override
 	public TypesDatasetDataPair updateDataColumnSpecs(String pageUsername,
 			DashboardDataset newSpecs) throws IllegalArgumentException {
 		TypesDatasetDataPair tddp = new TypesDatasetDataPair();
+		
         try {
-		
-		// Get the dashboard data store and current username, and validate that username
-		if ( ! validateRequest(pageUsername) ) 
-			throw new IllegalArgumentException("Invalid user request");
-
-		String datasetId = newSpecs.getDatasetId();
-		
-		// Retrieve all the current cruise data
-		DashboardDatasetData dataset = configStore.getDataFileHandler()
-						.getDatasetDataFromFiles(datasetId, 0, -1);
-		if ( ! dataset.isEditable() )
-			throw new IllegalArgumentException(datasetId + 
-					" has been submitted for QC; data column types cannot be modified.");
-
-		// Revise the data column types and units 
-		if ( newSpecs.getDataColTypes().size() != dataset.getDataColTypes().size() )
-			throw new IllegalArgumentException("Unexpected number of data columns (" +
-					newSpecs.getDataColTypes().size() + " instead of " + 
-					dataset.getDataColTypes().size());
-		dataset.setDataColTypes(newSpecs.getDataColTypes());
-
-		// Run the automated data checker with the updated data types.
-		// Assigns the data check status and the WOCE-3 and WOCE-4 flags.
-		DatasetChecker checker = configStore.getDashboardDatasetChecker(dataset.getFeatureType());
-		StdUserDataArray stdArray;
-        try {
-    		stdArray = checker.standardizeDataset(dataset, null);
-        } catch (Throwable ex) {
-            logger.warn("Exception checking dataset:"+ ex, ex);
-            throw new IllegalArgumentException("There was an error checking the dataset: " + ex.getMessage());
-        }
-
-		// Save and commit the updated data columns
-		configStore.getDataFileHandler().saveDatasetInfoToFile(dataset, 
-				"Data column types, units, and missing values for " + 
-				datasetId + " updated by " + username);
-		// Update the user-specific data column names to types, units, and missing values 
-		configStore.getUserFileHandler().updateUserDataColumnTypes(dataset, username);
-		
-        if ( stdArray.hasDate() && stdArray.hasLatitude() && stdArray.hasLongitude() &&
-                ! stdArray.hasMissingTimeOrLocation()) { 
-//              ! stdArray.hasCriticalError()) {
-            MetadataFileHandler metafiles = configStore.getMetadataFileHandler();
+    		// Get the dashboard data store and current username, and validate that username
+    		if ( ! validateRequest(pageUsername) ) 
+    			throw new IllegalArgumentException("Invalid user request");
+    
+    		String datasetId = newSpecs.getDatasetId();
+    		
+    		// Retrieve all the current cruise data
+    		DashboardDatasetData dataset = configStore.getDataFileHandler()
+    						.getDatasetDataFromFiles(datasetId, 0, -1);
+    		if ( ! dataset.isEditable() )
+    			throw new IllegalArgumentException(datasetId + 
+    					" has been submitted for QC; data column types cannot be modified.");
+    
+    		// Revise the data column types and units 
+    		if ( newSpecs.getDataColTypes().size() != dataset.getDataColTypes().size() )
+    			throw new IllegalArgumentException("Unexpected number of data columns (" +
+    					newSpecs.getDataColTypes().size() + " instead of " + 
+    					dataset.getDataColTypes().size());
+    		dataset.setDataColTypes(newSpecs.getDataColTypes());
+    
+    		// Run the automated data checker with the updated data types.
+    		// Assigns the data check status and the WOCE-3 and WOCE-4 flags.
+    		DatasetChecker checker = configStore.getDashboardDatasetChecker(dataset.getFeatureType());
+    		StdUserDataArray stdArray;
             try {
-                File metadataFile = metafiles.getMetadataFile(datasetId);
-                if ( ! metadataFile.exists()) { // Should not generally happen.
-                    logger.warn("Metadata file not found: " + metadataFile.getPath());
-                    OADSMetadata.createInitialOADSMetadataFile(datasetId, pageUsername);
+        		stdArray = checker.standardizeDataset(dataset, null);
+            } catch (Throwable ex) {
+                logger.warn("Exception checking dataset:"+ ex, ex);
+                throw new IllegalArgumentException("There was an error checking the dataset: " + ex.getMessage());
+            }
+    
+    		// Save and commit the updated data columns
+    		configStore.getDataFileHandler().saveDatasetInfoToFile(dataset, 
+    				"Data column types, units, and missing values for " + 
+    				datasetId + " updated by " + username);
+    		// Update the user-specific data column names to types, units, and missing values 
+    		configStore.getUserFileHandler().updateUserDataColumnTypes(dataset, username);
+    		
+            if ( stdArray.hasDate() && stdArray.hasLatitude() && stdArray.hasLongitude() &&
+                    ! stdArray.hasMissingTimeOrLocation()) { 
+    //              ! stdArray.hasCriticalError()) {
+                MetadataFileHandler metafiles = configStore.getMetadataFileHandler();
+                try {
+                    File metadataFile = metafiles.getMetadataFile(datasetId);
+                    if ( ! metadataFile.exists()) { // Should not generally happen.
+                        logger.warn("Metadata file not found: " + metadataFile.getPath());
+                        OADSMetadata.createInitialOADSMetadataFile(datasetId, pageUsername);
+                    }
+                    OadsMetadataDocumentType mdDoc = OADSMetadata.extractOADSMetadata(stdArray, metadataFile);
+    //                OadsMetadataDocumentType existgMd = MetadataFileHandler.
+        			metafiles.saveOadsXmlDoc(mdDoc, datasetId, "Auto-extraction from StdArray");
+                } catch (Exception ex) {
+                    logger.warn("Exception extracting metadata:"+ex, ex);
                 }
-                OadsMetadataDocumentType mdDoc = OADSMetadata.extractOADSMetadata(stdArray, metadataFile);
-//                OadsMetadataDocumentType existgMd = MetadataFileHandler.
-    			metafiles.saveOadsXmlDoc(mdDoc, datasetId, "Auto-extraction from StdArray");
-            } catch (Exception ex) {
-                logger.warn("Exception extracting metadata:"+ex, ex);
-            }
-            try {
-                metafiles.saveLocationsFile(stdArray);
-            } catch (Exception ex) {
-                logger.warn("Exception saving latlon file:"+ex, ex);
-            }
-		} else {
-		    logger.info("Dataset " + dataset.getRecordId() + " has critical error.  Unable to extract metadata.");
-		}
-		
-		// ??? Is this possible at this point for a user to be editing another user's dataset ?
-		if ( ! username.equals(dataset.getOwner()) )
-			configStore.getUserFileHandler().updateUserDataColumnTypes(dataset, dataset.getOwner());
-		
-		// Remove all but the first maximum-needed number of rows of cruise data 
-		// to minimize the payload of the returned cruise data
-		int numRows = dataset.getNumDataRows();
-		if ( numRows > DashboardUtils.MAX_ROWS_PER_GRID_PAGE ) {
-			dataset.getDataValues()
-				   .subList(DashboardUtils.MAX_ROWS_PER_GRID_PAGE, numRows)
-				   .clear();
-			dataset.getRowNums()
-				   .subList(DashboardUtils.MAX_ROWS_PER_GRID_PAGE, numRows)
-				   .clear();
-		}
-
-		logger.info("data columns specs updated for " + 
-				datasetId + " by " + username);
-		// Return the updated truncated cruise data for redisplay 
-		// in the DataColumnSpecsPage
-		tddp.setDatasetData(dataset);
-		
-		// So we can show the error message on the page.
-		// XXX TODO: ??? can't we get these from the stdArray ?
-		ADCMessageList msgs = getDataMessages(pageUsername, datasetId);
-		if ( msgs != null ) {
-			tddp.setMsgList(msgs);
-		}
+                try {
+                    metafiles.saveLocationsFile(stdArray);
+                } catch (Exception ex) {
+                    logger.warn("Exception saving latlon file:"+ex, ex);
+                }
+    		} else {
+    		    logger.info("Dataset " + dataset.getRecordId() + " has critical error.  Unable to extract metadata.");
+    		}
+    		
+    		// ??? Is this possible at this point for a user to be editing another user's dataset ?
+    		if ( ! username.equals(dataset.getOwner()) )
+    			configStore.getUserFileHandler().updateUserDataColumnTypes(dataset, dataset.getOwner());
+    		
+    		// Remove all but the first maximum-needed number of rows of cruise data 
+    		// to minimize the payload of the returned cruise data
+    		int numRows = dataset.getNumDataRows();
+    		if ( numRows > DashboardUtils.MAX_ROWS_PER_GRID_PAGE ) {
+    			dataset.getDataValues()
+    				   .subList(DashboardUtils.MAX_ROWS_PER_GRID_PAGE, numRows)
+    				   .clear();
+    			dataset.getRowNums()
+    				   .subList(DashboardUtils.MAX_ROWS_PER_GRID_PAGE, numRows)
+    				   .clear();
+    		}
+    
+    		logger.info("data columns specs updated for " + 
+    				datasetId + " by " + username);
+    		// Return the updated truncated cruise data for redisplay 
+    		// in the DataColumnSpecsPage
+    		tddp.setDatasetData(dataset);
+    		
+    		// So we can show the error message on the page.
+    		// XXX TODO: ??? can't we get these from the stdArray ?
+    		ADCMessageList msgs = getDataMessages(pageUsername, datasetId);
+    		if ( msgs != null ) {
+    			tddp.setMsgList(msgs);
+    		}
+    		return tddp;
         } catch (Throwable t) {
-            t.printStackTrace();
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error updating data column specifications", t);
         }
-		return tddp;
 	}
 
 	@Override
@@ -631,39 +708,45 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
 
-		DataFileHandler dataHandler = configStore.getDataFileHandler();
-		UserFileHandler userHandler = configStore.getUserFileHandler();
-		Logger dataSpecsLogger = logger;
-
-		for ( String datasetId : idsList ) {
-			// Retrieve all the current data
-			DashboardDatasetData dataset = dataHandler.getDatasetDataFromFiles(datasetId, 0, -1);
-			if ( ! dataset.isEditable() )
-				throw new IllegalArgumentException("Dataset " + datasetId + 
-						" has been submitted for QC; data column types cannot be modified.");
-
-    		DatasetChecker datasetChecker = configStore.getDashboardDatasetChecker(dataset.getFeatureType());
-			try {
-				// Identify the columns from stored names-to-types for this user
-				userHandler.assignDataColumnTypes(dataset);
-				// Save and commit these column assignments in case the sanity checker has problems
-				dataHandler.saveDatasetInfoToFile(dataset, "Column types for " + datasetId + 
-						" updated by " + username + " from post-processing a multiple-dataset upload");
-			
-				// Run the automated data checker with the updated data types.  Saves the messages,
-				// and assigns the data check status and the WOCE-3 and WOCE-4 flags.
-				datasetChecker.standardizeDataset(dataset, null);
-
-				// Save and commit the updated dataset information
-				dataHandler.saveDatasetInfoToFile(dataset, "Automated data check status and flags for " + 
-						datasetId + " updated by " + username + " from post-processing a multiple-dataset upload");
-				dataSpecsLogger.info("Updated data column specs for " + datasetId + " for " + username);
-			} catch (Exception ex) {
-				// ignore problems (such as unidentified columns) - cruise will not have been updated
-				dataSpecsLogger.error("Unable to update data column specs for " + datasetId + ": " + ex.getMessage());
-				continue;
-			}
-		}
+        try {
+    		DataFileHandler dataHandler = configStore.getDataFileHandler();
+    		UserFileHandler userHandler = configStore.getUserFileHandler();
+    		Logger dataSpecsLogger = logger;
+    
+    		for ( String datasetId : idsList ) {
+    			// Retrieve all the current data
+    			DashboardDatasetData dataset = dataHandler.getDatasetDataFromFiles(datasetId, 0, -1);
+    			if ( ! dataset.isEditable() )
+    				throw new IllegalArgumentException("Dataset " + datasetId + 
+    						" has been submitted for QC; data column types cannot be modified.");
+    
+        		DatasetChecker datasetChecker = configStore.getDashboardDatasetChecker(dataset.getFeatureType());
+    			try {
+    				// Identify the columns from stored names-to-types for this user
+    				userHandler.assignDataColumnTypes(dataset);
+    				// Save and commit these column assignments in case the sanity checker has problems
+    				dataHandler.saveDatasetInfoToFile(dataset, "Column types for " + datasetId + 
+    						" updated by " + username + " from post-processing a multiple-dataset upload");
+    			
+    				// Run the automated data checker with the updated data types.  Saves the messages,
+    				// and assigns the data check status and the WOCE-3 and WOCE-4 flags.
+    				datasetChecker.standardizeDataset(dataset, null);
+    
+    				// Save and commit the updated dataset information
+    				dataHandler.saveDatasetInfoToFile(dataset, "Automated data check status and flags for " + 
+    						datasetId + " updated by " + username + " from post-processing a multiple-dataset upload");
+    				dataSpecsLogger.info("Updated data column specs for " + datasetId + " for " + username);
+    			} catch (Exception ex) {
+    				// ignore problems (such as unidentified columns) - cruise will not have been updated
+    				dataSpecsLogger.error("Unable to update data column specs for " + datasetId + ": " + ex.getMessage());
+    				continue;
+    			}
+    		}
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error updating data columns", t);
+        }
 	}
 
 	@Override
@@ -673,18 +756,24 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
 
-		// Get the list of saved automated data checker messages for this dataset
-		ADCMessageList scMsgList;
-		try {
-			scMsgList = configStore.getCheckerMsgHandler().getCheckerMessages(datasetId);
-		} catch (Exception ex) {
-			logger.info("No messages for dataset id " + datasetId);
-			scMsgList = new ADCMessageList();
-//			throw new IllegalArgumentException("The automated data checker has not been run on dataset " + datasetId);
-		}
-		scMsgList.setUsername(username);
-		logger.info("returned automated data checker messages for " + datasetId + " for " + username);
-		return scMsgList;
+        try {
+    		// Get the list of saved automated data checker messages for this dataset
+    		ADCMessageList scMsgList;
+    		try {
+    			scMsgList = configStore.getCheckerMsgHandler().getCheckerMessages(datasetId);
+    		} catch (Exception ex) {
+    			logger.info("No messages for dataset id " + datasetId);
+    			scMsgList = new ADCMessageList();
+    //			throw new IllegalArgumentException("The automated data checker has not been run on dataset " + datasetId);
+    		}
+    		scMsgList.setUsername(username);
+    		logger.info("returned automated data checker messages for " + datasetId + " for " + username);
+    		return scMsgList;
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error retrieving data check messages", t);
+        }
 	}
 
 	// XXX NOT USED
@@ -726,31 +815,25 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		try {
 			MetadataPreviewInfo preview = OADSMetadata.getMetadataPreviewInfo(pageUsername, datasetId);
 			return preview;
-		} catch (Exception ex) {
-            logger.warn(ex, ex);
-			throw ex;
-		}
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error getting metadata preview information", t);
+        }
 	}
 
 	@SuppressWarnings("resource")
     @Override
 	public MetadataPreviewInfo sendMetadataInfo(String pageUsername, String datasetId)
     		throws NotFoundException, IllegalArgumentException {
-        String docId = null;
-        String metadataEditorPostEndpoint = null;
         try {
     		HttpServletRequest request = getThreadLocalRequest();
             MetadataPreviewInfo mdInfo = MetadataPoster.postMetadata(request, pageUsername, datasetId); 
             return mdInfo;
-        } catch (NotFoundException nfe) {
-            logger.warn("Unable to connect to MetadataEditor at " + metadataEditorPostEndpoint + ": " + nfe);
-            throw nfe;
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            throw new RuntimeException(ex);
         } catch (Throwable t) {
-            t.printStackTrace();
-            throw new RuntimeException(t);
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error posting metadata to the MetadataEditor", t);
         }
 	}
     
@@ -802,12 +885,10 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
     		}
     		List<PreviewTab> plots = configStore.getPreviewPlotsHandler().getPreviewPlots(datasetId, dataset.getFeatureType());
     		return new PreviewPlotResponse(plots, true);
-        } catch (Exception ex) {
-            logger.warn(ex,ex);
-            throw new IllegalArgumentException("There was an error generating the preview plots.\n"
-                    + "Please try again later.\n"
-                    + "If the problem persists, please contact the System Administrator at "
-                    + ApplicationConfiguration.getProperty("oap.email.account", "linus.kamb@noaa.gov"));
+        } catch (Throwable t) {
+            logger.warn(t,t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error building preview images", t);
         }
 	}
 
@@ -870,10 +951,16 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
     	logger.info("archiving datasets " + datasetIds.toString() + 
     			" submitted by " + username);
     	
-    	// Submit the datasets to Archive
-    	configStore.getDashboardDatasetSubmitter().archiveDatasets(datasetIds, columnsList, submitMsg,
-    															   requestDOI, archiveStatus, 
-    															   repeatSend, username);
+        try {
+        	// Submit the datasets to Archive
+        	configStore.getDashboardDatasetSubmitter().archiveDatasets(datasetIds, columnsList, submitMsg,
+        															   requestDOI, archiveStatus, 
+        															   repeatSend, username);
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error archiving dataset", t);
+        }
     }
 	
     @Override
@@ -885,9 +972,10 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
             SubmissionRecord srec = Archive.getCurrentSubmissionRecordForPackage(datasetId);
             String statusHtml = buildStatusHtml(srec);
             return statusHtml;
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            throw new IllegalStateException(ex);
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error retrieving archive submission status", t);
         }
     }
     
@@ -934,12 +1022,18 @@ public class DashboardServices extends RemoteServiceServlet implements Dashboard
 		if ( ! validateRequest(pageUsername) ) 
 			throw new IllegalArgumentException("Invalid user request");
 
-		for (String datasetId : idsSet) {
-			String message = "Suspending dataset " + datasetId;
-			DataFileHandler df = configStore.getDataFileHandler();
-			DashboardDataset ds = df.getDatasetFromInfoFile(datasetId);
-			ds.setSubmitStatus(DashboardUtils.STATUS_SUSPENDED);
-			df.saveDatasetInfoToFile(ds, message);
-		}
+        try {
+    		for (String datasetId : idsSet) {
+    			String message = "Suspending dataset " + datasetId;
+    			DataFileHandler df = configStore.getDataFileHandler();
+    			DashboardDataset ds = df.getDatasetFromInfoFile(datasetId);
+    			ds.setSubmitStatus(DashboardUtils.STATUS_SUSPENDED);
+    			df.saveDatasetInfoToFile(ds, message);
+    		}
+        } catch (Throwable t) {
+            logger.warn(t, t);
+            Notifications.Alert("SDIS Exception", t);
+            throw new DashboardServiceException("Error suspending datasets", t);
+        }
 	}
 }

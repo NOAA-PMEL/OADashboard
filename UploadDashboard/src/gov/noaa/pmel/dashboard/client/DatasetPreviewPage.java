@@ -127,7 +127,7 @@ public class DatasetPreviewPage extends CompositeWithUsername {
 		setUsername(null);
 		datasetId = "";
 		// Callback when generating plots
-		checkStatusCallback = new OAPAsyncCallback<PreviewPlotResponse>() {
+		checkStatusCallback = new OAPAsyncCallback<PreviewPlotResponse>("get preview images") {
 			@Override
 			public void onSuccess(PreviewPlotResponse plotResponse) {
 				logger.fine("Got response " + plotResponse);
@@ -147,13 +147,9 @@ public class DatasetPreviewPage extends CompositeWithUsername {
 				}
 			}
 			@Override
-			public void customFailure(Throwable ex) {
-				logger.log(Level.FINE, "Get Preview failure", ex);
-				if ( UploadDashboard.isCurrentPage(singleton) ) {
-					UploadDashboard.showAutoCursor();
-					UploadDashboard.showFailureMessage(PLOT_GENERATION_FAILURE_HTML, ex);
-					singleton.clearTabImages();
-				}
+			public void handleException(Throwable ex) {
+                super.handleException(ex);
+				singleton.clearTabImages();
 			}
 		};
 

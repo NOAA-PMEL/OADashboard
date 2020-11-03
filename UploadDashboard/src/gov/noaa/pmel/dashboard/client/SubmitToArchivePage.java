@@ -32,7 +32,6 @@ import com.google.gwt.user.client.ui.Label;
 import com.google.gwt.user.client.ui.TextArea;
 import com.google.gwt.user.client.ui.Widget;
 
-import gov.noaa.pmel.dashboard.client.DashboardAskPopup.QuestionType;
 import gov.noaa.pmel.dashboard.client.UploadDashboard.PagesEnum;
 import gov.noaa.pmel.dashboard.shared.DashboardDataset;
 import gov.noaa.pmel.dashboard.shared.DashboardDatasetList;
@@ -744,7 +743,7 @@ public class SubmitToArchivePage extends CompositeWithUsername implements DataSu
                     page.statusListPanel.setHTML("There was a problem retrieving package archive status.");
 				}
 			});
-		UploadDashboard.showMessageWithContinuation("Dataset submitted.", new OAPAsyncCallback<Void>() {
+		UploadDashboard.showMessageWithContinuation("Dataset submitted.", new OAPAsyncCallback<Void>("confirm") {
             @Override
             public void onSuccess(Void arg0) {
                 DatasetListPage.showPage();
