@@ -809,7 +809,7 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 			// Put up the wait cursor and send the rest of the cruises through the sanity checker
 			UploadDashboard.showWaitCursor();
 			expocodes.remove(0);
-			service.updateDataColumns(getUsername(), expocodes, new OAPAsyncCallback<Void>("update data column specification") {
+			service.updateDataColumns(getUsername(), expocodes, new OAPAsyncCallback<Void>("update data column specifications") {
 				@Override
 				public void onSuccess(Void result) {
 					// Go to the list of cruises without comment; return to the normal cursor
@@ -1082,7 +1082,7 @@ public class DataColumnSpecsPage extends CompositeWithUsername {
 		// This update invokes the SanityChecker on the data and
 		// the results are then reported back to this page.
 		service.updateDataColumnSpecs(getUsername(), cruise, 
-				new OAPAsyncCallback<TypesDatasetDataPair>("update data column specifications") {
+				new OAPAsyncCallback<TypesDatasetDataPair>("check data") {
 			@Override
 			public void onSuccess(TypesDatasetDataPair tddp) {
 				if ( tddp == null ) {
