@@ -145,18 +145,19 @@ public class DataUploadService extends HttpServlet {
             sendErrMsg(response, iex);
         } catch (Throwable ex) {
             logger.warn(ex, ex);
-            StackTraceElement[] trace = ex.getStackTrace();
-            StackTraceElement spot = trace != null && trace.length > 0 ?
-                                        trace[0] :
-                                        null;    
+//            StackTraceElement[] trace = ex.getStackTrace();
+//            StackTraceElement spot = trace != null && trace.length > 0 ?
+//                                        trace[0] :
+//                                        null;    
             StringBuilder msg = 
-                new StringBuilder("There was an error on the server.  Please try again later.")
-                    .append("\nError:")
-                    .append(ex.getClass().getName());
-            if ( spot != null ) {
-                msg.append(":")
-                   .append(spot.getFileName()).append(":").append(spot.getLineNumber());
-            }
+                new StringBuilder("There was an error processing your upload.  Please try again later.\n")
+                        .append("If the problem persists, please notify the system administrator at pmel.sdis@noaa.gov")
+;//                    .append("\nError:")
+//                    .append(ex.getClass().getName());
+//            if ( spot != null ) {
+//                msg.append(":")
+//                   .append(spot.getFileName()).append(":").append(spot.getLineNumber());
+//            }
             sendErrMsg(response, msg.toString());
         } finally {
             if ( paramMap != null ) {
