@@ -31,7 +31,7 @@ public abstract class OAPAsyncCallback<T> implements AsyncCallback<T> {
      * @see com.google.gwt.user.client.rpc.AsyncCallback#onFailure(java.lang.Throwable)
      */
     @Override
-    public final void onFailure(Throwable error) {
+    public void onFailure(Throwable error) {
         UploadDashboard.showAutoCursor();
         UploadDashboard.logToConsole(error.toString());
         if ( !sessionExpired(error) ) {

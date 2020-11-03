@@ -103,8 +103,8 @@ public class ApplicationHeaderTemplate extends Composite {
                 Window.Location.assign("dashboardlogout.html");
             }
             @Override
-            public void handleException(Throwable ex) {
-                UploadDashboard.logToConsole("Logout error:" + ex.toString());
+            public void onFailure(Throwable ex) {
+                GWT.log("Logout error:" + ex.toString());
 //                Window.alert(String.valueOf(ex));
                 Cookies.removeCookie("JSESSIONID");
                 UploadDashboard.stopHistoryHandling();
