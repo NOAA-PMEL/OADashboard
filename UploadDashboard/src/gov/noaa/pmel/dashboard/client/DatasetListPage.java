@@ -1949,7 +1949,8 @@ public class DatasetListPage extends CompositeWithUsername {
 		dataCheckColumn.setFieldUpdater(new FieldUpdater<DashboardDataset,String>() {
 			@Override
 			public void update(int index, DashboardDataset cruise, String value) {
-                if ( FileType.OTHER.equals(cruise.getFileType())) {
+                if ( ! cruise.getFeatureType().isDSG() ||
+                     ! cruise.getFileType().equals(FileType.DELIMITED)) {
                     GWT.log("Cannot view/edit columns for OTHER-type datasets.");
 //                    UploadDashboard.showMessage("This observation type cannot be checked.");
                     return;
